@@ -6,8 +6,8 @@ services:
     restart: unless-stopped
 
     environment:
-      MEMMY_MEMORY_HOST=0.0.0.0
-      MEMMY_MEMORY_PORT=18960
+      MEMMY_MEMORY_HOST: 0.0.0.0
+      MEMMY_MEMORY_PORT: 18960
       MEMMY_HOME: /data
       MEMORY_SERVICE_TOKEN: ${MEMORY_SERVICE_TOKEN}
 
