@@ -3,19 +3,37 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
 
     environment:
-      MEMMY_MEMORY_HOST: 0.0.0.0
-      MEMMY_MEMORY_PORT: 18960
-      MEMMY_HOME: /data
+      # Memmy 自己仍然只允许 loopback
+      MEMMY_MEMORY_HOST: 127.0.0.1
+
+      # 改成内部端口，避免和 socat 的 18960 冲突
+      MEMMY_MEMORY_PORT: 18961
+
       MEMORY_SERVICE_TOKEN: ${MEMORY_SERVICE_TOKEN}
+
+    ports:
+      - "18960:18960"
 
     volumes:
       - memmy-data:/data
 
-    ports:
-      - "18960:18960"
+  memmy-proxy:
+    image: alpine/socat
+    restart: unless-stopped
+
+    # 关键：与 memmy 共用网络命名空间
+    network_mode: "service:memmy"
+
+    command:
+      - TCP-LISTEN:18960,fork,reuseaddr
+      - TCP:127.0.0.1:18961
+
+    depends_on:
+      - memmy
 
 volumes:
   memmy-data:
