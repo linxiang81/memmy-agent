@@ -1,0 +1,19 @@
+services:
+  memmy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+    environment:
+      MEMMY_HOME: /data
+      MEMORY_SERVICE_TOKEN: "换成一个长随机字符串"
+
+    volumes:
+      - memmy-data:/data
+
+    ports:
+      - "18960:18960"
+
+volumes:
+  memmy-data:
