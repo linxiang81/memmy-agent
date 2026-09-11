@@ -3,23 +3,36 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+
     restart: unless-stopped
 
     environment:
+      # Memmy 强制要求自身只监听 loopback
       MEMMY_MEMORY_HOST: 127.0.0.1
+
+      # Memmy 内部监听 18961
+      # 18960 留给 nginx 对外提供服务
       MEMMY_MEMORY_PORT: 18961
+
+      # 在 Dokploy Environment Variables 中配置
       MEMORY_SERVICE_TOKEN: ${MEMORY_SERVICE_TOKEN}
+
+      MEMMY_HOME: /data
 
     volumes:
       - memmy-data:/data
 
+    # 这里暴露的 18960 实际由共享网络空间中的 nginx 监听
     ports:
       - "18960:18960"
-      
+
   memmy-proxy:
     image: nginx:alpine
+
     restart: unless-stopped
 
+    # 与 memmy 共享 network namespace
+    # 因此 nginx 可以访问 127.0.0.1:18961
     network_mode: "service:memmy"
 
     depends_on:
@@ -35,18 +48,34 @@ services:
         http {
             server {
                 listen 18960;
+                server_name _;
 
                 location / {
                     proxy_pass http://127.0.0.1:18961;
 
+                    # Memmy 要求 Viewer 请求看起来来自 loopback
                     proxy_set_header Host 127.0.0.1:18961;
+
+                    # Memmy Viewer 还会检查 same-origin
                     proxy_set_header Origin http://127.0.0.1:18961;
                     proxy_set_header Referer http://127.0.0.1:18961/;
 
                     proxy_http_version 1.1;
+
+                    # WebSocket / upgrade 兼容
+                    proxy_set_header Upgrade $$http_upgrade;
+                    proxy_set_header Connection "upgrade";
+
+                    # 超时适当放宽
+                    proxy_read_timeout 300s;
+                    proxy_send_timeout 300s;
                 }
             }
         }
         EOF
 
         exec nginx -g 'daemon off;'
+
+volumes:
+  memmy-data:
+  
