@@ -7,33 +7,56 @@ services:
     restart: unless-stopped
 
     environment:
-      # Memmy 自己仍然只允许 loopback
       MEMMY_MEMORY_HOST: 127.0.0.1
-
-      # 改成内部端口，避免和 socat 的 18960 冲突
       MEMMY_MEMORY_PORT: 18961
-
       MEMORY_SERVICE_TOKEN: ${MEMORY_SERVICE_TOKEN}
-
-    ports:
-      - "18960:18960"
 
     volumes:
       - memmy-data:/data
 
+    # 对外开放的是 nginx 的 18960
+    ports:
+      - "18960:18960"
+
   memmy-proxy:
-    image: alpine/socat
+    image: nginx:alpine
     restart: unless-stopped
 
-    # 关键：与 memmy 共用网络命名空间
+    # 与 memmy 共用 network namespace
+    # 这样 nginx 可以访问 127.0.0.1:18961
     network_mode: "service:memmy"
-
-    command:
-      - TCP-LISTEN:18960,fork,reuseaddr
-      - TCP:127.0.0.1:18961
 
     depends_on:
       - memmy
+
+    command:
+      - /bin/sh
+      - -c
+      - |
+        cat > /etc/nginx/nginx.conf <<'EOF'
+        events {}
+
+        http {
+            server {
+                listen 18960;
+
+                location / {
+                    proxy_pass http://127.0.0.1:18961;
+
+                    # Memmy Viewer 要求 Host 必须是 loopback
+                    proxy_set_header Host 127.0.0.1:18961;
+
+                    proxy_http_version 1.1;
+
+                    proxy_set_header X-Real-IP $remote_addr;
+                    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                    proxy_set_header X-Forwarded-Proto $scheme;
+                }
+            }
+        }
+        EOF
+
+        exec nginx -g 'daemon off;'
 
 volumes:
   memmy-data:
