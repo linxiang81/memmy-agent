@@ -1,3 +1,21 @@
+services:
+  memmy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+    environment:
+      MEMMY_MEMORY_HOST: 127.0.0.1
+      MEMMY_MEMORY_PORT: 18961
+      MEMORY_SERVICE_TOKEN: ${MEMORY_SERVICE_TOKEN}
+
+    volumes:
+      - memmy-data:/data
+
+    ports:
+      - "18960:18960"
+      
   memmy-proxy:
     image: nginx:alpine
     restart: unless-stopped
